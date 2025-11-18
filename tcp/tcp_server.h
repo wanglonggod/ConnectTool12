@@ -10,18 +10,14 @@
 #include <isteamnetworkingutils.h>
 #include <steamnetworkingtypes.h>
 
-using boost::asio::ip::tcp;
+class SteamNetworkingManager;
 
-// Extern declarations for global variables used in TCPServer
-extern HSteamNetConnection g_hConnection;
-extern bool g_isConnected;
-extern ISteamNetworkingSockets* m_pInterface;
-extern bool forwarding;
+using boost::asio::ip::tcp;
 
 // TCP Server class
 class TCPServer {
 public:
-    TCPServer(int port);
+    TCPServer(int port, SteamNetworkingManager* manager);
     ~TCPServer();
 
     bool start();
@@ -43,4 +39,6 @@ private:
     std::mutex clientsMutex_;
     std::thread serverThread_;
     bool hasAcceptedConnection_;
+    SteamNetworkingManager* manager_;
+    bool forwarding_;
 };

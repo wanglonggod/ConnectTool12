@@ -28,16 +28,21 @@ bool TCPClient::connect() {
 void TCPClient::disconnect() {
     if (disconnected_) return;
     disconnected_ = true;
-    if (disconnectCallback_) {
-        disconnectCallback_();
-    }
     connected_ = false;
     io_context_.stop();
     if (clientThread_.joinable()) {
-        clientThread_.join();
+        if (clientThread_.get_id() == std::this_thread::get_id()) {
+            clientThread_.detach();
+        } else {
+            clientThread_.join();
+        }
     }
-    if (socket_->is_open()) {
-        socket_->close();
+    try {
+        if (socket_->is_open()) {
+            socket_->close();
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "Error closing socket: " << e.what() << std::endl;
     }
 }
 
@@ -89,6 +94,9 @@ void TCPClient::handle_read(const boost::system::error_code& error, std::size_t 
             std::cout << "Connection closed by peer" << std::endl;
         } else {
             std::cerr << "Read failed: " << error.message() << std::endl;
+        }
+        if (disconnectCallback_) {
+            disconnectCallback_();
         }
         disconnect();
     }

@@ -10,11 +10,20 @@
 const char* CONTROL_PREFIX = "CONTROL:";
 const size_t CONTROL_PREFIX_LEN = 8;
 
-SteamMessageHandler::SteamMessageHandler(boost::asio::io_context& io_context, ISteamNetworkingSockets* interface, std::vector<HSteamNetConnection>& connections, std::map<HSteamNetConnection, TCPClient*>& clientMap, std::mutex& clientMutex, std::mutex& connectionsMutex, std::unique_ptr<TCPServer>& server, bool& g_isHost, int& localPort)
+SteamMessageHandler::SteamMessageHandler(boost::asio::io_context& io_context, ISteamNetworkingSockets* interface, std::vector<HSteamNetConnection>& connections, std::map<HSteamNetConnection, std::shared_ptr<TCPClient>>& clientMap, std::mutex& clientMutex, std::mutex& connectionsMutex, std::unique_ptr<TCPServer>& server, bool& g_isHost, int& localPort)
     : io_context_(io_context), m_pInterface_(interface), connections_(connections), clientMap_(clientMap), clientMutex_(clientMutex), connectionsMutex_(connectionsMutex), server_(server), g_isHost_(g_isHost), localPort_(localPort), running_(false) {}
 
 SteamMessageHandler::~SteamMessageHandler() {
     stop();
+}
+
+void SteamMessageHandler::handleControlPacket(const char* data, size_t size, HSteamNetConnection conn) {
+    std::string_view packetData(data, size);
+    std::cout << "Received control packet: " << packetData << " from connection " << conn << std::endl;
+    // Add handling logic here
+    if (packetData == "ping") {
+        std::cout << "Responding to ping" << std::endl;
+    }
 }
 
 void SteamMessageHandler::start() {
@@ -71,7 +80,7 @@ void SteamMessageHandler::pollMessages() {
                 }
                 // Lazy connect: Create TCP Client on first message if not already connected
                 if (clientMap_.find(conn) == clientMap_.end() && g_isHost_ && localPort_ > 0) {
-                    TCPClient* client = new TCPClient("localhost", localPort_);
+                    auto client = std::make_shared<TCPClient>("localhost", localPort_);
                     if (client->connect()) {
                         client->setReceiveCallback([conn, this](const char* data, size_t size) {
                             std::lock_guard<std::mutex> lock(clientMutex_);
@@ -79,20 +88,19 @@ void SteamMessageHandler::pollMessages() {
                         });
                         client->setDisconnectCallback([conn, this]() {
                             std::lock_guard<std::mutex> lock(clientMutex_);
-                            m_pInterface_->CloseConnection(conn, 0, nullptr, false);
-                            std::cout << "Closed Steam connection due to TCP client disconnect" << std::endl;
+                            if (clientMap_.count(conn)) {
+                                clientMap_[conn]->disconnect();
+                                clientMap_.erase(conn);
+                                std::cout << "TCP client disconnected, removed from map" << std::endl;
+                            }
                         });
                         clientMap_[conn] = client;
                         std::cout << "Created TCP Client for connection on first message" << std::endl;
                     } else {
                         std::cerr << "Failed to connect TCP Client for connection" << std::endl;
-                        delete client;
                     }
                 }
                 // Send to corresponding TCP client if exists (for host)
-                if (clientMap_.count(conn)) {
-                    clientMap_[conn]->send((const char*)pIncomingMsg->m_pData, pIncomingMsg->m_cbSize);
-                }
             }
             pIncomingMsg->Release();
         }
