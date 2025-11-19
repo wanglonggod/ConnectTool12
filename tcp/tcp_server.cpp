@@ -66,7 +66,7 @@ void TCPServer::start_accept() {
     acceptor_.async_accept(*socket, [this, socket](const boost::system::error_code& error) {
         if (!error) {
             std::cout << "New client connected" << std::endl;
-            uint32_t id = multiplexManager_->addClient(socket);
+            std::string id = multiplexManager_->addClient(socket);
             {
                 std::lock_guard<std::mutex> lock(clientsMutex_);
                 clients_.push_back(socket);
@@ -79,7 +79,7 @@ void TCPServer::start_accept() {
     });
 }
 
-void TCPServer::start_read(std::shared_ptr<tcp::socket> socket, uint32_t id) {
+void TCPServer::start_read(std::shared_ptr<tcp::socket> socket, std::string id) {
     auto buffer = std::make_shared<std::vector<char>>(1024);
     socket->async_read_some(boost::asio::buffer(*buffer), [this, socket, buffer, id](const boost::system::error_code& error, std::size_t bytes_transferred) {
         if (!error) {

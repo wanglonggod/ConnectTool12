@@ -1,10 +1,11 @@
 #include "multiplex_manager.h"
+#include "nanoid/nanoid.h"
 #include <iostream>
 #include <cstring>
 
 MultiplexManager::MultiplexManager(ISteamNetworkingSockets* steamInterface, HSteamNetConnection steamConn,
                                    boost::asio::io_context& io_context, bool& isHost, int& localPort)
-    : steamInterface_(steamInterface), steamConn_(steamConn), nextId_(1),
+    : steamInterface_(steamInterface), steamConn_(steamConn),
       io_context_(io_context), isHost_(isHost), localPort_(localPort) {}
 
 MultiplexManager::~MultiplexManager() {
@@ -16,14 +17,14 @@ MultiplexManager::~MultiplexManager() {
     clientMap_.clear();
 }
 
-uint32_t MultiplexManager::addClient(std::shared_ptr<tcp::socket> socket) {
+std::string MultiplexManager::addClient(std::shared_ptr<tcp::socket> socket) {
     std::lock_guard<std::mutex> lock(mapMutex_);
-    uint32_t id = nextId_++;
+    std::string id = nanoid::generate(6);
     clientMap_[id] = socket;
     return id;
 }
 
-void MultiplexManager::removeClient(uint32_t id) {
+void MultiplexManager::removeClient(const std::string& id) {
     std::lock_guard<std::mutex> lock(mapMutex_);
     auto it = clientMap_.find(id);
     if (it != clientMap_.end()) {
@@ -32,7 +33,7 @@ void MultiplexManager::removeClient(uint32_t id) {
     }
 }
 
-std::shared_ptr<tcp::socket> MultiplexManager::getClient(uint32_t id) {
+std::shared_ptr<tcp::socket> MultiplexManager::getClient(const std::string& id) {
     std::lock_guard<std::mutex> lock(mapMutex_);
     auto it = clientMap_.find(id);
     if (it != clientMap_.end()) {
@@ -41,31 +42,32 @@ std::shared_ptr<tcp::socket> MultiplexManager::getClient(uint32_t id) {
     return nullptr;
 }
 
-void MultiplexManager::sendTunnelPacket(uint32_t id, const char* data, size_t len, int type) {
-    // Packet format: uint32_t id, uint32_t type, then data if type==0
-    size_t packetSize = sizeof(uint32_t) * 2 + (type == 0 ? len : 0);
+void MultiplexManager::sendTunnelPacket(const std::string& id, const char* data, size_t len, int type) {
+    // Packet format: string id (6 chars + null), uint32_t type, then data if type==0
+    size_t idLen = id.size() + 1; // include null terminator
+    size_t packetSize = idLen + sizeof(uint32_t) + (type == 0 ? len : 0);
     std::vector<char> packet(packetSize);
-    uint32_t* pId = reinterpret_cast<uint32_t*>(&packet[0]);
-    uint32_t* pType = reinterpret_cast<uint32_t*>(&packet[sizeof(uint32_t)]);
-    *pId = id;
+    std::memcpy(&packet[0], id.c_str(), idLen);
+    uint32_t* pType = reinterpret_cast<uint32_t*>(&packet[idLen]);
     *pType = type;
     if (type == 0 && data) {
-        std::memcpy(&packet[sizeof(uint32_t) * 2], data, len);
+        std::memcpy(&packet[idLen + sizeof(uint32_t)], data, len);
     }
     steamInterface_->SendMessageToConnection(steamConn_, packet.data(), packet.size(), k_nSteamNetworkingSend_Reliable, nullptr);
 }
 
 void MultiplexManager::handleTunnelPacket(const char* data, size_t len) {
-    if (len < sizeof(uint32_t) * 2) {
+    size_t idLen = 7; // 6 + null
+    if (len < idLen + sizeof(uint32_t)) {
         std::cerr << "Invalid tunnel packet size" << std::endl;
         return;
     }
-    uint32_t id = *reinterpret_cast<const uint32_t*>(data);
-    uint32_t type = *reinterpret_cast<const uint32_t*>(data + sizeof(uint32_t));
+    std::string id(data, 6);
+    uint32_t type = *reinterpret_cast<const uint32_t*>(data + idLen);
     if (type == 0) {
         // Data packet
-        size_t dataLen = len - sizeof(uint32_t) * 2;
-        const char* packetData = data + sizeof(uint32_t) * 2;
+        size_t dataLen = len - idLen - sizeof(uint32_t);
+        const char* packetData = data + idLen + sizeof(uint32_t);
         auto socket = getClient(id);
         if (!socket && isHost_ && localPort_ > 0) {
             // 如果是主持且没有对应的 TCP Client，创建一个连接到本地端口

@@ -51,6 +51,7 @@ void SteamMessageHandler::pollMessages() {
         ISteamNetworkingMessage* pIncomingMsgs[10];
         int numMsgs = m_pInterface_->ReceiveMessagesOnConnection(conn, pIncomingMsgs, 10);
         for (int i = 0; i < numMsgs; ++i) {
+            std::cout << "Received message on connection " << conn << std::endl;
             ISteamNetworkingMessage* pIncomingMsg = pIncomingMsgs[i];
             const char* data = (const char*)pIncomingMsg->m_pData;
             size_t size = pIncomingMsg->m_cbSize;

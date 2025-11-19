@@ -31,7 +31,7 @@ public:
 
 private:
     void start_accept();
-    void start_read(std::shared_ptr<tcp::socket> socket, uint32_t id);
+    void start_read(std::shared_ptr<tcp::socket> socket, std::string id);
 
     int port_;
     bool running_;
