@@ -129,6 +129,40 @@ bool SteamNetworkingManager::joinHost(uint64 hostID)
     }
 }
 
+void SteamNetworkingManager::disconnect()
+{
+    std::lock_guard<std::mutex> lock(connectionsMutex);
+    
+    // Close client connection
+    if (g_hConnection != k_HSteamNetConnection_Invalid)
+    {
+        m_pInterface->CloseConnection(g_hConnection, 0, nullptr, false);
+        g_hConnection = k_HSteamNetConnection_Invalid;
+    }
+    
+    // Close all host connections
+    for (auto conn : connections)
+    {
+        m_pInterface->CloseConnection(conn, 0, nullptr, false);
+    }
+    connections.clear();
+    
+    // Close listen socket
+    if (hListenSock != k_HSteamListenSocket_Invalid)
+    {
+        m_pInterface->CloseListenSocket(hListenSock);
+        hListenSock = k_HSteamListenSocket_Invalid;
+    }
+    
+    // Reset state
+    g_isHost = false;
+    g_isClient = false;
+    g_isConnected = false;
+    hostPing_ = 0;
+    
+    std::cout << "Disconnected from network" << std::endl;
+}
+
 void SteamNetworkingManager::setMessageHandlerDependencies(boost::asio::io_context &io_context, std::unique_ptr<TCPServer> &server, int &localPort)
 {
     io_context_ = &io_context;

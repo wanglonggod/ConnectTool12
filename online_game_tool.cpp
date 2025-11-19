@@ -208,20 +208,11 @@ int main()
         if ((steamManager.isHost() || steamManager.isConnected()) && roomManager.getCurrentLobby().IsValid())
         {
             ImGui::Begin("房间状态");
-            if (!steamManager.isHost())
-            {
-                ImGui::Text("与主机延迟: %d ms", steamManager.getHostPing());
-            }
-            ImGui::Separator();
             ImGui::Text("用户列表:");
-            int columnCount = steamManager.isHost() ? 2 : 1;
-            if (ImGui::BeginTable("UserTable", columnCount, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
+            if (ImGui::BeginTable("UserTable", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
             {
                 ImGui::TableSetupColumn("名称");
-                if (steamManager.isHost())
-                {
-                    ImGui::TableSetupColumn("延迟 (ms)");
-                }
+                ImGui::TableSetupColumn("延迟 (ms)");
                 ImGui::TableHeadersRow();
                 {
                     std::vector<CSteamID> members = roomManager.getLobbyMembers();
@@ -232,17 +223,17 @@ int main()
                         ImGui::TableNextColumn();
                         const char *name = SteamFriends()->GetFriendPersonaName(memberID);
                         ImGui::Text("%s", name);
-                        if (steamManager.isHost())
+                        ImGui::TableNextColumn();
+                        if (memberID == mySteamID)
                         {
-                            ImGui::TableNextColumn();
-                            if (memberID == mySteamID)
-                            {
-                                ImGui::Text("-");
-                            }
-                            else
+                            ImGui::Text("-");
+                        }
+                        else
+                        {
+                            int ping = 0;
+                            if (steamManager.isHost())
                             {
                                 // Find connection for this member
-                                int ping = 0;
                                 std::lock_guard<std::mutex> lockConn(connectionsMutex);
                                 for (const auto &conn : steamManager.getConnections())
                                 {
@@ -256,8 +247,13 @@ int main()
                                         }
                                     }
                                 }
-                                ImGui::Text("%d", ping);
                             }
+                            else
+                            {
+                                // Client shows ping to host
+                                ping = steamManager.getHostPing();
+                            }
+                            ImGui::Text("%d", ping);
                         }
                     }
                 }
