@@ -2,9 +2,9 @@ name: CI Build
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   build:
@@ -14,17 +14,24 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # 1️⃣ 安装依赖（Boost / OpenGL / 其他可能需要的库）
-      - name: Install dependencies
+      - name: Install OpenGL, GLFW, Boost and other dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libboost-all-dev libgl1-mesa-dev libglu1-mesa-dev
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            libgl1-mesa-dev \
+            libglu1-mesa-dev \
+            freeglut3-dev \
+            mesa-common-dev \
+            libglfw3-dev \
+            libglew-dev \
+            libglm-dev \
+            libassimp-dev \
+            libboost-all-dev
 
-      # 2️⃣ 配置 CMake
       - name: Configure with CMake
         run: cmake -S . -B build
 
-      # 3️⃣ 编译
       - name: Build
         run: cmake --build build
-
