@@ -1,40 +1,30 @@
-name: C++ Build
+name: CI Build
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
   pull_request:
-    branches: [main]
+    branches: [ main ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-    # 🧱 安装所有常用图形渲染依赖 （OpenGL / GLFW / GLM / Assimp / Glew）
-    - name: Install OpenGL & GLFW & GLM & Assimp & Glew dependencies
-      run: |
-        sudo apt update
-        sudo apt install -y \
-          build-essential \
-          cmake \
-          libgl1-mesa-dev \
-          libglu1-mesa-dev \
-          freeglut3-dev \
-          mesa-common-dev \
-          libglfw3-dev \
-          libglew-dev \
-          libglm-dev \
-          libassimp-dev
+      # 1️⃣ 安装依赖（Boost / OpenGL / 其他可能需要的库）
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libboost-all-dev libgl1-mesa-dev libglu1-mesa-dev
 
-    # 🛠️ CMake 配置
-    - name: Configure CMake
-      run: cmake -S . -B build
+      # 2️⃣ 配置 CMake
+      - name: Configure with CMake
+        run: cmake -S . -B build
 
-    # 🔨 编译
-    - name: Build
-      run: cmake --build build --config Release
+      # 3️⃣ 编译
+      - name: Build
+        run: cmake --build build
 
