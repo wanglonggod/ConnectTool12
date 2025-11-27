@@ -14,14 +14,27 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
 
-    - name: Install OpenGL dependencies
+    # 🧱 安装所有常用图形渲染依赖 （OpenGL / GLFW / GLM / Assimp / Glew）
+    - name: Install OpenGL & GLFW & GLM & Assimp & Glew dependencies
       run: |
         sudo apt update
-        sudo apt install -y libgl1-mesa-dev libglu1-mesa-dev freeglut3-dev mesa-common-dev
+        sudo apt install -y \
+          build-essential \
+          cmake \
+          libgl1-mesa-dev \
+          libglu1-mesa-dev \
+          freeglut3-dev \
+          mesa-common-dev \
+          libglfw3-dev \
+          libglew-dev \
+          libglm-dev \
+          libassimp-dev
 
+    # 🛠️ CMake 配置
     - name: Configure CMake
       run: cmake -S . -B build
 
+    # 🔨 编译
     - name: Build
       run: cmake --build build --config Release
 
